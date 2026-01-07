@@ -227,10 +227,12 @@ mkLoggers ::
   (MonadIO m, MonadBaseControl IO m) =>
   HashSet (EngineLogType Hasura) ->
   LogLevel ->
+  RedactedLogFields ->
   ManagedT m Loggers
-mkLoggers enabledLogs logLevel = do
+mkLoggers enabledLogs logLevel redactedFields = do
   loggerCtx <- mkLoggerCtx (defaultLoggerSettings True logLevel) enabledLogs
-  let logger = mkLogger loggerCtx
+  let redactionConfig = mkRedactionConfig redactedFields
+      logger = mkLogger loggerCtx redactionConfig
       pgLogger = mkPGLogger logger
   pure $ Loggers loggerCtx logger pgLogger
 
@@ -403,7 +405,7 @@ initialiseAppEnv BasicConnectionInfo {..} serveOptions@ServeOptions {..} liveQue
     $ throwErrExit InvalidEnvironmentVariableOptionsError
     $ "Fatal Error: requires either HASURA_GRAPHQL_AUTH_HOOK, HASURA_GRAPHQL_JWT_SECRET, or HASURA_GRAPHQL_UNAUTHORIZED_ROLE when the admin secret is disabled"
 
-  loggers@(Loggers _loggerCtx logger pgLogger) <- mkLoggers soEnabledLogTypes soLogLevel
+  loggers@(Loggers _loggerCtx logger pgLogger) <- mkLoggers soEnabledLogTypes soLogLevel soRedactedLogFields
 
   -- SIDE EFFECT: print a warning if no admin secret is set.
   when (not soDisableAdminSecret && null soAdminSecret)

@@ -58,6 +58,12 @@ module Hasura.Logging
     StoredIntrospectionLog (..),
     StoredIntrospectionStorageLog (..),
     RemoteSchemaHealingLog (..),
+
+    -- * Log redaction
+    RedactedLogFields (..),
+    RedactionConfig (..),
+    mkRedactionConfig,
+    redactJSON,
   )
 where
 
@@ -83,6 +89,7 @@ import Data.Time.Format qualified as Format
 import Data.Time.LocalTime qualified as Time
 import Hasura.Base.Error (QErr)
 import Hasura.CachedTime
+import Hasura.Logging.Redaction (RedactedLogFields (..), RedactionConfig (..), mkRedactionConfig, redactJSON)
 import Hasura.Prelude
 import Hasura.Tracing.Class qualified as Tracing
 import Hasura.Tracing.Context
@@ -448,8 +455,8 @@ pattern Logger {unLogger} <- (newToOrig -> unLogger)
 newToOrig :: Logger impl -> (forall a m. (ToEngineLog a impl, MonadIO m) => a -> m ())
 newToOrig (LoggerTracing f) = fmap Tracing.runNoMonadTraceContext f
 
-mkLogger :: (J.ToJSON (EngineLogType impl)) => LoggerCtx impl -> Logger impl
-mkLogger (LoggerCtx loggerSet serverLogLevel timeGetter enabledLogTypes logsExporter) = LoggerTracing $ \l -> do
+mkLogger :: (J.ToJSON (EngineLogType impl)) => LoggerCtx impl -> RedactionConfig -> Logger impl
+mkLogger (LoggerCtx loggerSet serverLogLevel timeGetter enabledLogTypes logsExporter) redactionConfig = LoggerTracing $ \l -> do
   -- NOTE: This has us logging a trace and span id even  in the OSS server,
   -- where tracing isn't actually supported.  We decided this was fine, and
   -- actually might end up being useful as a way for OSS users to correlate
@@ -459,8 +466,10 @@ mkLogger (LoggerCtx loggerSet serverLogLevel timeGetter enabledLogTypes logsExpo
       mbCurrentTrace = tcCurrentTrace <$> cxt
   localTime <- liftIO timeGetter
   let (logLevel, logTy, logDet) = toEngineLog l
+      -- Apply redaction to sensitive fields before logging
+      redactedLogDet = redactJSON redactionConfig logDet
   when (logLevel >= serverLogLevel && isLogTypeEnabled enabledLogTypes logTy) $ liftIO do
-    let logLine = EngineLog localTime logLevel logTy logDet mbCurrentTrace mbCurrentSpan
+    let logLine = EngineLog localTime logLevel logTy redactedLogDet mbCurrentTrace mbCurrentSpan
     FL.pushLogStrLn loggerSet $ FL.toLogStr (J.encode logLine)
     logsExporter >>= \f -> f logLine
 

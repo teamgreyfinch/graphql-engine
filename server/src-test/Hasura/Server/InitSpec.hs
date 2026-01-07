@@ -77,6 +77,7 @@ emptyServeOptionsRaw =
       rsoEnableAllowList = UUT.AllowListDisabled,
       rsoEnabledLogTypes = Nothing,
       rsoLogLevel = Nothing,
+      rsoRedactedLogFields = Nothing,
       rsoDevMode = UUT.DevModeDisabled,
       rsoAdminInternalErrors = Nothing,
       rsoEventsHttpPoolSize = Nothing,

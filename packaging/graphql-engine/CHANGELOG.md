@@ -11,7 +11,20 @@ the date of its commit (`git log --format='%h %ad %s' --date=short`) and its
 commit subject. To find the image, pick the ECR tag `v<version>-<sha>` whose
 commit is that one or a later one (`git log --oneline` shows the shas).
 
-Entry format, as a heading `## <commit date> <commit subject>`: upstream base,
+Entry format, as a heading `## 2026-01-07 feat(server): add log redaction for sensitive fields
+
+- **Base:** upstream v2.51.6 (`ci: tag release v2.51.6`).
+- **Changes:** log redaction (`feat(server): add log redaction for sensitive fields`,
+  authored by Dario Cravero in his fork and applied here).
+- **Behaviour:** new `HASURA_GRAPHQL_REDACTED_LOG_FIELDS` / `--redacted-log-fields`,
+  a JSON array of field names (e.g. `["password", "token"]`). In every log entry, the
+  values of JSON keys matching a name are replaced with `"[REDACTED]"`; matching
+  ignores case, `_` and `-`, and is exact on the whole key (`token` does not match
+  `access_token`). Secrets inside strings, such as literals in the logged `query`
+  text, are not redacted. Default `[]`: no redaction, same as the official image.
+  This is not in the official image.
+
+## <commit date> <commit subject>`: upstream base,
 what changed (`git log <marker>..HEAD` lists our changes), and any behaviour
 difference from the official image.
 
