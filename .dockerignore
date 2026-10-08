@@ -6,3 +6,7 @@
 /server/tests-py/.pytest-cache
 /server/tests-py/__pycache__
 /server/tests-py/node_modules
+# docs/scripts for the image build itself; keep them out of the build context so
+# editing them doesn't invalidate the compile cache
+/packaging/graphql-engine/README.md
+/packaging/graphql-engine/build.sh
