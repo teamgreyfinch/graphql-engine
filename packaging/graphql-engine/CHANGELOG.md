@@ -18,3 +18,15 @@ official image.
 - **Changes:** image packaging only (`packaging/graphql-engine/`, `.dockerignore`).
 - **Behaviour:** none; same as the official v2.51.0 image (community edition, no
   MSSQL ODBC drivers, Postgres only, console assets from the official image).
+
+## v2.51.0-b63bfebabf
+
+- **Base:** upstream v2.51.0 (`ci: tag release v2.51.0`).
+- **Changes:** support for multiple admin secrets via `HASURA_GRAPHQL_ADMIN_SECRETS`
+  (`server: support multiple admin secrets with HASURA_GRAPHQL_ADMIN_SECRETS`), on
+  top of the previous entry.
+- **Behaviour:** `HASURA_GRAPHQL_ADMIN_SECRETS` accepts a JSON array of admin
+  secrets (e.g. `["secret1", "secret2"]`); any of them authenticates as admin. It
+  takes precedence over `HASURA_GRAPHQL_ADMIN_SECRET` when both are set, and
+  invalid JSON fails startup. This is not in the official image. Otherwise the same
+  as the previous entry.
