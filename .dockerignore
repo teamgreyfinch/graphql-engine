@@ -10,3 +10,5 @@
 # editing them doesn't invalidate the compile cache
 /packaging/graphql-engine/README.md
 /packaging/graphql-engine/build.sh
+# CI config, same reason
+/.circleci
