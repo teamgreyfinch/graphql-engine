@@ -39,7 +39,7 @@ git log <marker>..greyfinch                             # exactly what we change
 The version says which Hasura release we are based on; the short sha pins the exact
 source including our patches (`git rev-parse <sha>` expands it).
 
-Which image holds which changes is recorded in [CHANGELOG.md](CHANGELOG.md); update it on every push.
+What changed, and when, is recorded in [CHANGELOG.md](CHANGELOG.md); add an entry in the same commit as each change.
 
 ### Moving to a new upstream release
 
@@ -56,10 +56,30 @@ git push --force-with-lease origin greyfinch
 ```
 
 Always rebase onto a marker commit of a **released** version, never an arbitrary
-`master` commit. Rebasing rewrites our shas, so tag the commit of every image you
-publish (`git tag image/<ecr-tag>` and push it) to keep old images traceable.
+`master` commit. Rebasing rewrites our shas, which is why the changelog identifies
+changes by commit date and subject rather than by sha.
 
 ## Build and publish
+
+### CircleCI (normal path)
+
+Every push to `greyfinch` runs [.circleci/config.yml](../../.circleci/config.yml)
+on an arm64 machine executor: it calls `build.sh --push`, which builds the image
+and pushes `v<version>-<sha>` plus `latest` to all four ECR repositories. This
+file replaces Hasura's upstream CircleCI config (which can't run for us); if it
+conflicts during a rebase onto a new release, keep ours
+(`git checkout --theirs .circleci/config.yml`; "theirs" is our commit in a rebase).
+
+One-time setup: CircleCI project for `teamgreyfinch/graphql-engine`, and a context
+`hasura-ecr-push` with `AWS_ACCOUNT_ID`, `AWS_DEFAULT_REGION` (together they give the
+registry `<account>.dkr.ecr.<region>.amazonaws.com`), `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` (an IAM user allowed `ecr:GetAuthorizationToken` and push
+actions on the four repositories) and optionally `DOCKERHUB_USERNAME` /
+`DOCKERHUB_PASSWORD`. To rebuild without a new commit, use "Rerun workflow" in
+the CircleCI UI. A build takes about an hour (no layer cache in CI). CI does not
+deploy to ECS.
+
+### Locally
 
 ```sh
 packaging/graphql-engine/build.sh --print-tag   # show the tag only
@@ -73,7 +93,7 @@ environment variables to the command, no `export` required:
 ```sh
 aws sso login --profile greyfinch-admin
 
-R=415033802971.dkr.ecr.us-east-1.amazonaws.com
+R=<account-id>.dkr.ecr.us-east-1.amazonaws.com
 AWS_PROFILE=greyfinch-admin \
 ECR_REPO="$R/gf-training-hasura-graphql-engine $R/greyfinch-demo-hasura-graphql-engine $R/greyfinch-staging-hasura-graphql-engine $R/hub-production-hasura-graphql-engine" \
   packaging/graphql-engine/build.sh --push
