@@ -547,14 +547,18 @@ v1MetadataHandler ::
   m (HttpResponse EncJSON)
 v1MetadataHandler schemaCacheRefUpdater closeWebsocketsOnMetadataChangeAction query = Tracing.newSpan "Metadata" Tracing.SKInternal $ do
   (liftEitherM . authorizeV1MetadataApi query) =<< ask
-  appContext <- asks hcAppContext
-  r <-
-    schemaCacheRefUpdater $ \schemaCache ->
-      runMetadataQuery
-        appContext
-        schemaCache
-        closeWebsocketsOnMetadataChangeAction
-        query
+  r <- case runStorageOnlyMetadataQuery query of
+    -- Doesn't depend on metadata or the schema cache: skip the metadata fetch
+    -- and the global schema cache lock.
+    Just action -> action
+    Nothing -> do
+      appContext <- asks hcAppContext
+      schemaCacheRefUpdater $ \schemaCache ->
+        runMetadataQuery
+          appContext
+          schemaCache
+          closeWebsocketsOnMetadataChangeAction
+          query
   pure $ HttpResponse r []
 
 v2QueryHandler ::
