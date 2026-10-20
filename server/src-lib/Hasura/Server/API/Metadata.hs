@@ -3,6 +3,7 @@ module Hasura.Server.API.Metadata
   ( RQLMetadata,
     RQLMetadataV1 (..),
     runMetadataQuery,
+    runStorageOnlyMetadataQuery,
   )
 where
 
@@ -216,6 +217,20 @@ runMetadataQuery appContext schemaCache closeWebsocketsOnMetadataChange RQLMetad
       (MaintenanceModeEnabled (), ReadOnlyModeEnabled) ->
         throw500 "metadata cannot be modified in maintenance mode"
     else pure (r, modSchemaCache)
+
+-- | Requests that only touch the scheduled events tables in metadata storage.
+--
+-- They neither read nor modify metadata or the schema cache, so callers can run
+-- them without fetching the metadata or taking the schema cache lock. Keep in
+-- sync with 'queryModifiesMetadata' and 'runMetadataQueryV1M'.
+runStorageOnlyMetadataQuery ::
+  (MonadError QErr m, MonadMetadataStorage m) =>
+  RQLMetadata ->
+  Maybe (m EncJSON)
+runStorageOnlyMetadataQuery RQLMetadata {_rqlMetadata} = case _rqlMetadata of
+  RMV1 (RMCreateScheduledEvent q) -> Just (runCreateScheduledEvent q)
+  RMV1 (RMDeleteScheduledEvent q) -> Just (runDeleteScheduledEvent q)
+  _ -> Nothing
 
 queryModifiesMetadata :: RQLMetadataRequest -> Bool
 queryModifiesMetadata = \case
