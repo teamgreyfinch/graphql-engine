@@ -15,7 +15,7 @@ push).
 - **One long-lived branch**, rebased onto each new upstream release. No branch
   per release.
 - **Behaves like the official image:** the server reports the upstream version
-  (`v2.51.0`), and console assets are copied from the official image of the same
+  (e.g. `v2.51.6`), and console assets are copied from the official image of the same
   release (the console is built in a separate pipeline we don't run).
 - **Postgres only** (no MSSQL ODBC drivers), single-architecture images: build
   natively on the target arch (arm64 for our ECS tasks); QEMU cross-builds are
@@ -35,7 +35,7 @@ git log --grep='^ci: tag release' --format='%h %s' -3   # markers in history
 git log <marker>..greyfinch                             # exactly what we changed
 ```
 
-**Image tag:** `v<upstream version>-<10-char git sha>`, e.g. `v2.51.0-514ca3f7ef`.
+**Image tag:** `v<upstream version>-<10-char git sha>`, e.g. `v2.51.6-514ca3f7ef`.
 The version says which Hasura release we are based on; the short sha pins the exact
 source including our patches (`git rev-parse <sha>` expands it).
 
@@ -54,6 +54,28 @@ git diff --stat "$NEW" vX.Y.Z -- . ':!releases'   # must print nothing: marker =
 git rebase --onto "$NEW" "$OLD" greyfinch
 git push --force-with-lease origin greyfinch
 ```
+
+Then check what upstream changed in how it builds its image, and mirror it in
+[multistage.dockerfile](multistage.dockerfile), which is a hand-maintained copy and does
+**not** follow upstream automatically. Rebasing brings in source and `cabal.project`
+changes by itself, but not these:
+
+```sh
+git diff "$OLD" "$NEW" --stat -- packaging server/VERSIONS.json cabal.project
+git diff "$OLD" "$NEW" -- packaging/graphql-engine-base/ubuntu.dockerfile \
+  packaging/graphql-engine-base/server-builder.dockerfile server/VERSIONS.json
+```
+
+| Upstream file | Our counterpart in `multistage.dockerfile` |
+| --- | --- |
+| `ubuntu.dockerfile` `FROM ubuntu:...` | `ARG UBUNTU_IMAGE` |
+| `ubuntu.dockerfile` runtime packages and security checks | the first `RUN` of the runtime stage (`base`); skip the MSSQL ODBC block |
+| `ubuntu.dockerfile` `postgresql-client-N` (pg_dump) | the pg_dump `RUN` |
+| `server-builder.dockerfile` libraries | the builder stage's `apt-get install` |
+| `server/VERSIONS.json` (`ghc`, `cabal-install`) | `ARG GHC_VERSION`, `ARG CABAL_VERSION` |
+
+Also bump the fallback `CONSOLE_ASSETS_IMAGE` default, and add a changelog entry.
+The `ubi.dockerfile` changes don't apply, we only build the Ubuntu image.
 
 Always rebase onto a marker commit of a **released** version, never an arbitrary
 `master` commit. Rebasing rewrites our shas, which is why the changelog identifies
@@ -119,10 +141,10 @@ Dockerfile build args (set by `build.sh` where noted):
 
 | Arg | Default | Purpose |
 | --- | --- | --- |
-| `HGE_VERSION` | `v2-greyfinch`; `build.sh` passes the release, e.g. `v2.51.0` | Written to the gitignored `server/CURRENT_VERSION` and compiled in; what `graphql-engine version` reports. |
-| `CONSOLE_ASSETS_IMAGE` | `hasura/graphql-engine:v2.51.0`; `build.sh` passes the matching release | Official image the console assets are copied from. |
+| `HGE_VERSION` | `v2-greyfinch`; `build.sh` passes the release, e.g. `v2.51.6` | Written to the gitignored `server/CURRENT_VERSION` and compiled in; what `graphql-engine version` reports. |
+| `CONSOLE_ASSETS_IMAGE` | `hasura/graphql-engine:v2.51.6`; `build.sh` passes the matching release | Official image the console assets are copied from. |
 | `BUILD_JOBS` | `4` | Parallel GHC jobs, ~2 GB RAM each. Lower it if GHC gets OOM-killed. |
-| `GHC_VERSION`, `CABAL_VERSION` | from `server/VERSIONS.json` | Toolchain. |
+| `GHC_VERSION`, `CABAL_VERSION` | copied by hand from `server/VERSIONS.json` | Toolchain. |
 
 Without `build.sh`, from the repo root:
 `docker buildx build -f packaging/graphql-engine/multistage.dockerfile -t my-hge .`

@@ -14,7 +14,7 @@
 #   PLATFORM        default: native (linux/arm64 or linux/amd64)
 #   BUILD_JOBS      passed through to the Dockerfile (default there)
 #   CONSOLE_ASSETS_IMAGE  official image to take console assets from (default: hasura/graphql-engine:<version>)
-#   HGE_VERSION     version the server reports (default: the upstream release, e.g. v2.51.0)
+#   HGE_VERSION     version the server reports (default: the upstream release, e.g. v2.51.6)
 #   ALLOW_DIRTY=1   build even with uncommitted changes in the build inputs
 set -euo pipefail
 
@@ -78,7 +78,9 @@ args+=(--build-arg "HGE_VERSION=${HGE_VERSION:-$version}")
 
 echo "==> upstream version: $version"
 echo "==> image tag:        $tag ($PLATFORM)"
-docker buildx build "${args[@]}" --load .
+# No provenance/SBOM attestations: they make `docker push` upload an image index plus
+# untagged attestation manifests (3 entries in ECR per build, which ECR can't scan).
+docker buildx build "${args[@]}" --provenance=false --sbom=false --load .
 
 if [ "$mode" = push ]; then
   : "${ECR_REPO:?set ECR_REPO to push}"

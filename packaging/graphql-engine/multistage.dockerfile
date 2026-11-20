@@ -4,9 +4,10 @@
 #   docker buildx build --platform linux/arm64 \
 #     -f packaging/graphql-engine/multistage.dockerfile -t my-hge:v2 .
 
-ARG UBUNTU_IMAGE=ubuntu:noble-20260911
+# Keep in sync with packaging/graphql-engine-base/ubuntu.dockerfile (see README, "Moving to a new upstream release").
+ARG UBUNTU_IMAGE=ubuntu:noble-20261024.1
 # Fallback only; build.sh overrides this with the release matching the checkout.
-ARG CONSOLE_ASSETS_IMAGE=hasura/graphql-engine:v2.51.0
+ARG CONSOLE_ASSETS_IMAGE=hasura/graphql-engine:v2.51.6
 
 ###############################################################################
 # Stage 0: console assets from an official release image (ARG must be global to be used in FROM)
@@ -82,7 +83,15 @@ RUN set -ex; \
     apt-get update; \
     apt-get upgrade -y; \
     apt-get install -y --no-install-recommends \
-      ca-certificates curl libkrb5-3 libpq5 libnuma1 unixodbc netcat-traditional; \
+      apt-transport-https ca-certificates curl libbrotli1 libkrb5-3 libpq5 libnuma1 unixodbc netcat-traditional; \
+    # Security checks mirrored from upstream's ubuntu.dockerfile (v2.51.6): fail the build \
+    # if the mirror lacks the fixed packages. \
+    dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge "20260816ubuntu0.24.04.1"; \
+    dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge "1.1.0-2ubuntu0.1"; \
+    for pkg in apt apt-transport-https libapt-pkg6.0t64; do \
+      dpkg --compare-versions "$(dpkg-query -W -f='${Version}' "$pkg")" ge "2.8.4ubuntu0.1"; \
+    done; \
+    update-ca-certificates --fresh; \
     rm -f /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/certs/ssl-cert-snakeoil.pem; \
     apt-get -y auto-remove; \
     apt-get -y clean; \

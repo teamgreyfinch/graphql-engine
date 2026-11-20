@@ -18,6 +18,23 @@ difference from the official image.
 New entries go at the top. The entries keyed by image tag further down are from
 the earlier format and are kept as is.
 
+## 2026-11-20 packaging: note rebase onto upstream v2.51.6
+
+- **Base:** upstream v2.51.6 (`ci: tag release v2.51.6`), up from v2.51.0. The
+  image tag changes from `v2.51.0-<sha>` to `v2.51.6-<sha>`, and the console
+  assets now come from `hasura/graphql-engine:v2.51.6`.
+- **Changes:** rebase only, plus everything upstream shipped between v2.51.0 and
+  v2.51.6. Our patches are unchanged: multi-stage packaging, multiple admin
+  secrets, ECR build from CircleCI, and skipping the metadata fetch and schema
+  cache lock for one-off scheduled events (this last one had no entry before).
+- **Image build:** `multistage.dockerfile` mirrors upstream's base image changes
+  since v2.51.0: Ubuntu `noble-20260911` -> `noble-20261024.1`, `libbrotli1` and
+  `apt-transport-https` installed, build fails if `ca-certificates`, `libbrotli1` or
+  `apt` are older than the security-fixed versions, and `update-ca-certificates
+  --fresh`. GHC and cabal are unchanged (9.14.1 / 3.16.1.0).
+- **Behaviour:** as the entries below, plus the upstream fixes in v2.51.1 to
+  v2.51.6. To roll back, deploy the newest ECR tag `v2.51.0-<sha>`.
+
 ## v2.51.0-b63bfebabf
 
 - **Base:** upstream v2.51.0 (`ci: tag release v2.51.0`).
